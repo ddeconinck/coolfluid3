@@ -28,6 +28,7 @@
 #include "solver/Tags.hpp"
 
 #include "../Tags.hpp"
+#include "../InitialConditions.hpp"
 
 namespace cf3 {
 namespace UFEM {
@@ -57,6 +58,16 @@ struct EquilibriumEuler::VelocityFunctor : FunctionBase
     RealMatrix2 grad_u;
     grad_u.row(XX) = grad_ux;
     grad_u.row(YY) = grad_uy;
+    compute_velocity(u, u1, g, tau, grad_u);
+  }
+
+  template<typename VectorT>
+  void operator()(const VectorT& u, const VectorT& u1, const VectorT& g, const Real tau, const VectorT& grad_ux, const VectorT& grad_uy, const VectorT& grad_uz)
+  {
+    RealMatrix3 grad_u;
+    grad_u.row(XX) = grad_ux;
+    grad_u.row(YY) = grad_uy;
+    grad_u.row(ZZ) = grad_uz;
     compute_velocity(u, u1, g, tau, grad_u);
   }
 
@@ -111,6 +122,10 @@ EquilibriumEuler::EquilibriumEuler(const std::string& name) :
   options().add("compute_gradient", true)
     .pretty_name("Compute Gradient")
     .description("Compute the fluid velocity gradient, or rely on previously computed value");
+    
+  options().add("initial_conditions", Handle<UFEM::InitialConditions>())
+    .pretty_name("Initial Conditions")
+    .description("The component that is used to manage the initial conditions in the solver this action belongs to");
 }
 
 EquilibriumEuler::~EquilibriumEuler()
@@ -126,6 +141,8 @@ void EquilibriumEuler::on_regions_set()
     {
       m_velocity_gradient = Handle<common::Action>(create_component("VelocityGradient", "cf3.UFEM.VelocityGradient"));
       m_velocity_gradient->configure_option_recursively("physical_model", options()["physical_model"].value());
+      m_velocity_gradient->options().set("initial_conditions", options()["initial_conditions"].value());
+      options().option("initial_conditions").link_option(m_velocity_gradient->options().option_ptr("initial_conditions"));
     }
     m_velocity_gradient->options().set("velocity_variable", options().option("velocity_variable").value());
     m_velocity_gradient->options().set("velocity_tag", options().option("velocity_tag").value());
@@ -142,10 +159,10 @@ void EquilibriumEuler::on_regions_set()
   FieldVariable<3, VectorField> g("Force", "body_force");
   FieldVariable<4, ScalarField> tau(options().value<std::string>("tau_variable"), "ufem_particle_relaxation_time");
   
+  m_functor->v.resize(dim);
+
   if(dim == 2)
   {
-    m_functor->v.resize(2);
-
     FieldVariable<5, VectorField> grad_ux("grad_ux", grad_tag);
     FieldVariable<6, VectorField> grad_uy("grad_uy", grad_tag);
     
@@ -160,18 +177,18 @@ void EquilibriumEuler::on_regions_set()
   }
   else if(dim == 3)
   {
-    m_functor->v.resize(2);
-//     FieldVariable<2, VectorField> grad_ux("grad_ux", grad_tag);
-//     FieldVariable<3, VectorField> grad_uy("grad_uy", grad_tag);
-//     FieldVariable<4, VectorField> grad_uz("grad_uz", grad_tag);
-//     
-//     set_expression(elements_expression
-//     (
-//       boost::mpl::vector3<mesh::LagrangeP1::Tetra3D, mesh::LagrangeP1::Hexa3D, mesh::LagrangeP1::Prism3D>(),
-//       detail::set_gradient(u, valence, grad_ux, grad_uy, grad_uz)
-//     ));
-//     
-//     m_zero_fields->set_expression(nodes_expression(group(grad_ux[_i] = 0., grad_uy[_i] = 0., grad_uz[_i] = 0.)));
+    FieldVariable<5, VectorField> grad_ux("grad_ux", grad_tag);
+    FieldVariable<6, VectorField> grad_uy("grad_uy", grad_tag);
+    FieldVariable<7, VectorField> grad_uz("grad_uz", grad_tag);
+
+    set_expression(nodes_expression_3d
+    (
+      group
+      (
+        lit(*m_functor)(u, u1, g, tau, grad_ux, grad_uy, grad_uz),
+        v[_i] = lit(m_functor->v)[_i]
+      )
+    ));
   }
   else
   {

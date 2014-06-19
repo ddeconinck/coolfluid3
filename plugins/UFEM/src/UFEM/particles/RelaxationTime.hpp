@@ -7,6 +7,8 @@
 #ifndef cf3_UFEM_RelaxationTime_hpp
 #define cf3_UFEM_RelaxationTime_hpp
 
+#include "math/Consts.hpp"
+
 #include "solver/actions/Proto/ProtoAction.hpp"
 #include "solver/actions/Proto/Expression.hpp"
 
@@ -16,6 +18,23 @@ namespace cf3 {
 namespace UFEM {
 namespace particles {
 
+// Functor to compute the squared particle radius
+struct SquaredParticleRadius : solver::actions::Proto::FunctionBase
+{
+  typedef Real result_type;
+  
+  Real operator()(const Real c, const Real zeta)
+  {
+    const Real r2 = ::pow(3./(4.*math::Consts::pi())*zeta/c*m_reference_volume, 2./3.);
+    if(!std::isfinite(r2))
+      return 0.;
+    
+    return r2;
+  }
+  
+  Real m_reference_volume;
+};
+  
 /// Compute the particle relaxation time
 class RelaxationTime : public solver::actions::Proto::ProtoAction
 {
@@ -32,6 +51,8 @@ public: // functions
 
 private:
   virtual void on_regions_set();
+
+  SquaredParticleRadius r2;
 };
 
 } // particles

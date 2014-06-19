@@ -1,9 +1,6 @@
 import sys
 import coolfluid as cf
 import numpy as np
-import os
-from optparse import OptionParser
-import pylab as pl
 
 env = cf.Core.environment()
 
@@ -18,7 +15,7 @@ nu = 1./5000.
 
 segs = 32
 D = 0.5
-Vs = 1/(4.*np.pi)
+Vs = 1./(1.5*np.pi)
 Ua = 0.
 Va = 0.
 
@@ -27,7 +24,7 @@ beta = 3.
 
 dt = 0.1
 
-numsteps = 20
+numsteps = 100
 write_interval = 50
 
 
@@ -120,7 +117,13 @@ conv = solver.add_unsteady_solver('cf3.UFEM.particles.EquilibriumEulerConvergenc
 conv.tau = tau
 
 particle_c = solver.add_unsteady_solver('cf3.UFEM.particles.ParticleConcentration')
-#particle_c.options.alpha_su = 0.
+particle_c.options.supg_type = 'metric'
+#particle_c.options.c1 = 0.
+#particle_c.options.c2 = 0.
+#particle_c.options.alpha_su = 30.
+particle_c.options.c0 = 2.
+particle_c.options.d0 = 0.05
+
 
 # Set up the physical constants
 physics.density = 1.
@@ -178,8 +181,7 @@ for i in range(len(error_fd)):
   err_row[0] = err_array[i][0]
   err_row[1] = err_array[i][1]
 
-writer.fields = [mesh.geometry.taylor_green.uri(), mesh.geometry.ufem_particle_velocity.uri(), error_fd.uri(), mesh.geometry.particle_concentration.uri(), mesh.geometry.particle_velocity_gradient.uri(), mesh.geometry.ufem_particle_convergence.uri(), mesh.geometry.velocity_gradient.uri()]
-writer.file = cf.URI('taylor-green-error.pvtu')
-writer.execute()
+domain.write_mesh(cf.URI('taylor-green-end.pvtu'))
+
 
 

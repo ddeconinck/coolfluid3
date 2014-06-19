@@ -55,8 +55,12 @@ private:
   std::vector<std::string> m_velocity_variables;
   std::vector<std::string> m_concentration_src_variables;
   std::vector<std::string> m_weighted_volume_src_variables;
+  std::vector<std::string> m_gradient_tags;
   
   Handle<LSSAction> m_concentration_solver;
+  Handle<common::Group> m_boundary_conditions;
+
+  Real m_reference_volume;
 };
 
 } // particles
